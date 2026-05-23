@@ -32,6 +32,7 @@ func New() cli.Command {
 func Action(ctx context.Context, cmd *cli.Command) error {
 	// Apply theme from config/flags
 	ApplyTheme(cmd.String(FlagTheme))
+	SetThumbnailFormat(cmd.Bool(FlagKittyGraphics))
 
 	defer ShowCursor()
 

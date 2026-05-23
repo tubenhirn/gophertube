@@ -264,7 +264,16 @@ func gophertubeDownloadsMode(cmd *cli.Command) bool {
 			time.Sleep(600 * time.Millisecond)
 			return false
 		}
-		selected, back, exit, err := runMenuTea("Downloads", "Esc to back • Ctrl+C to exit", videoFiles)
+		thumbPreview := func(idx int) string {
+			if idx < 0 || idx >= len(videoFiles) {
+				return ""
+			}
+			name := videoFiles[idx]
+			ext := filepath.Ext(name)
+			base := strings.TrimSuffix(name, ext)
+			return filepath.Join(dlPath, base+".jpg")
+		}
+		selected, back, exit, err := runMenuTeaWithPreview("Downloads", "Esc to back • Ctrl+C to exit", videoFiles, thumbPreview)
 		if err != nil || exit {
 			return exit
 		}

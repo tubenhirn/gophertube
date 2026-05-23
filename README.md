@@ -67,7 +67,7 @@ GopherTube is a tui based youtube client. It scrapes and parses the youtube webs
 - TOML config
 - **Download videos** with quality selection ([yt-dlp](https://github.com/yt-dlp/yt-dlp))
 - **Downloads menu**: browse and play downloaded videos
-- **Thumbnail preview** in downloads menu
+- **Thumbnail preview** in search results and downloads menu (requires [chafa](https://hpjansson.org/chafa/))
 
 ## Who is this Project for?
 - this project is for everyone who enjoys tuis,
@@ -130,6 +130,7 @@ quality = "1080p"           # default: 1080p (options: 1080p, 720p, 480p, 360p, 
 downloads_path = "/home/$USER/Videos/GopherTube"  # where to save downloads
 theme = "Minimal"                                 # default: Minimal (options: Minimal, Gopher, Gruvbox, etc)
 fullscreen = true                                 # default: true; set to false for windowed mpv (tiling WMs)
+kitty_graphics = false                            # default: false; set to true in Kitty/WezTerm/Ghostty for inline-image thumbnails
 ```
 
 ### Configuration Options
@@ -141,6 +142,7 @@ fullscreen = true                                 # default: true; set to false 
 | downloads_path   | string | "$HOME/Videos/GopherTube"                | Directory to save downloads.                 |
 | theme            | string | "Minimal"                                 | Default application theme.                   |
 | fullscreen       | bool   | true                                      | Start mpv in fullscreen for video playback. Set to `false` for tiling WMs. |
+| kitty_graphics   | bool   | false                                     | Render thumbnails via the Kitty graphics protocol (Kitty, WezTerm, Ghostty, …). Falls back to Unicode block symbols when disabled or when chafa is unavailable. |
 
 ---
 
@@ -149,7 +151,7 @@ fullscreen = true                                 # default: true; set to false 
 
 ## Roadmap
 
-- thumbnail support in the bubbletea rewrite
+- _open — suggestions welcome_
 
 ## Star History
 

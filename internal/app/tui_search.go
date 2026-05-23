@@ -29,22 +29,24 @@ type searchResultMsg struct {
 }
 
 type searchModel struct {
-	state       searchState
-	input       textinput.Model
-	filter      textinput.Model
-	filterOn    bool
-	spin        spinner.Model
-	query       string
-	limit       int
-	searchLimit int
-	videos      []types.Video
-	cursor      int
-	width       int
-	height      int
-	errMsg      string
-	selected    int
-	back        bool
-	exit        bool
+	state        searchState
+	input        textinput.Model
+	filter       textinput.Model
+	filterOn     bool
+	spin         spinner.Model
+	query        string
+	limit        int
+	searchLimit  int
+	videos       []types.Video
+	cursor       int
+	width        int
+	height       int
+	errMsg       string
+	selected     int
+	back         bool
+	exit         bool
+	kittyMode    bool
+	lastImageKey string
 }
 
 func newSearchModel(searchLimit int) searchModel {
@@ -68,6 +70,7 @@ func newSearchModel(searchLimit int) searchModel {
 		spin:        sp,
 		searchLimit: searchLimit,
 		selected:    -1,
+		kittyMode:   KittyModeActive(),
 	}
 }
 
@@ -86,7 +89,61 @@ func (m searchModel) Init() tea.Cmd {
 	return textinput.Blink
 }
 
+// syncImage returns m with lastImageKey updated, plus a tea.Cmd that places or
+// clears the kitty image to match the current state. No-op when kitty mode is
+// inactive.
+func (m searchModel) syncImage() (searchModel, tea.Cmd) {
+	if !m.kittyMode {
+		return m, nil
+	}
+	wantClear := m.state != searchStateResults || m.width <= 0 || m.filterOn
+	var path string
+	var col, row, cols, rows int
+	if !wantClear {
+		filtered := m.filteredIndices()
+		if len(filtered) == 0 || m.cursor < 0 || m.cursor >= len(filtered) {
+			wantClear = true
+		} else {
+			v := m.videos[filtered[m.cursor]]
+			if v.ThumbnailPath == "" {
+				wantClear = true
+			} else {
+				path = v.ThumbnailPath
+				leftW := min(56, m.width/2)
+				if leftW < 36 {
+					leftW = 36
+				}
+				cols = leftW - uiPadLeft
+				rows = 16
+				col = uiPadLeft
+				row = uiPadTop
+			}
+		}
+	}
+	var key string
+	if !wantClear {
+		key = fmt.Sprintf("%s|%dx%d@%dx%d", path, cols, rows, col, row)
+	}
+	if key == m.lastImageKey {
+		return m, nil
+	}
+	m.lastImageKey = key
+	if wantClear {
+		return m, func() tea.Msg { ClearKittyImages(); return nil }
+	}
+	return m, func() tea.Msg {
+		PlaceKittyThumbnail(path, col, row, cols, rows)
+		return nil
+	}
+}
+
 func (m searchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	model, cmd := m.update(msg)
+	model, imgCmd := model.syncImage()
+	return model, tea.Batch(cmd, imgCmd)
+}
+
+func (m searchModel) update(msg tea.Msg) (searchModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -290,9 +347,9 @@ func (m searchModel) renderResults() string {
 	}
 	right := strings.Join(lines, "\n")
 
-	leftW := min(42, totalW/2)
-	if leftW < 30 {
-		leftW = 30
+	leftW := min(56, totalW/2)
+	if leftW < 36 {
+		leftW = 36
 	}
 	rightW := totalW - leftW - 2
 	if rightW < 30 {
@@ -318,19 +375,46 @@ func (m searchModel) renderLeftPane() (string, int) {
 	if totalW <= 0 {
 		totalW = 100
 	}
-	leftW := min(42, totalW/2)
-	if leftW < 30 {
-		leftW = 30
+	leftW := min(56, totalW/2)
+	if leftW < 36 {
+		leftW = 36
 	}
-	lines := []string{
+
+	var sections []string
+
+	thumbCols := leftW - uiPadLeft
+	if thumbCols < 24 {
+		thumbCols = 24
+	}
+	const thumbRows = 16
+	if m.kittyMode {
+		sections = append(sections, strings.Repeat("\n", thumbRows-1))
+	} else if thumb := RenderThumbnailANSI(v.ThumbnailPath, thumbCols, thumbRows); thumb != "" {
+		sections = append(sections, indentLines(strings.TrimRight(thumb, "\n"), uiIndent()))
+	}
+
+	detailLines := []string{
 		uiIndent() + textAccent.Render("Details"),
 		uiIndent() + textStrong.Render("Channel: ") + textEmphasis.Render(v.Author),
 		uiIndent() + textWarn.Render("Duration: ") + textAccent.Render(v.Duration),
 		uiIndent() + textMuted.Render("Published: ") + textPrimary.Render(v.Published),
 		uiIndent() + textMuted.Render("Views: ") + textPrimary.Render(v.Views),
 	}
-	content := strings.Join(lines, "\n")
+	sections = append(sections, strings.Join(detailLines, "\n"))
+
+	content := strings.Join(sections, "\n")
 	return content, strings.Count(content, "\n") + 1
+}
+
+func indentLines(s, indent string) string {
+	if s == "" {
+		return s
+	}
+	lines := strings.Split(s, "\n")
+	for i := range lines {
+		lines[i] = indent + lines[i]
+	}
+	return strings.Join(lines, "\n")
 }
 
 func (m searchModel) startSearchCmd() tea.Cmd {
@@ -433,6 +517,7 @@ func fuzzyScore(text, query string) (int, bool) {
 }
 
 func runSearchTea(searchLimit int) (query string, videos []types.Video, selected int, back bool, exit bool, err error) {
+	defer ClearKittyImages()
 	p := tea.NewProgram(newSearchModel(searchLimit), tea.WithAltScreen(), tea.WithMouseAllMotion())
 	m, err := p.Run()
 	if err != nil {
@@ -443,6 +528,7 @@ func runSearchTea(searchLimit int) (query string, videos []types.Video, selected
 }
 
 func runSearchTeaWithState(searchLimit int, query string, videos []types.Video, cursor int) (q string, vids []types.Video, selected int, back bool, exit bool, err error) {
+	defer ClearKittyImages()
 	p := tea.NewProgram(newSearchModelWithState(searchLimit, query, videos, cursor), tea.WithAltScreen(), tea.WithMouseAllMotion())
 	m, err := p.Run()
 	if err != nil {
