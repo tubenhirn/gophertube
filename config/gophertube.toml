@@ -13,3 +13,7 @@ theme = "Minimal"
 # Start mpv in fullscreen for video playback (default: true).
 # Set to false to play in a windowed mpv (e.g. when using a tiling window manager).
 fullscreen = true
+# Use the Kitty graphics protocol for thumbnail previews (default: false).
+# Only enable this in terminals that support it (e.g. Kitty, WezTerm, Ghostty).
+# When false, chafa falls back to Unicode block symbols, which work in any terminal.
+kitty_graphics = false
